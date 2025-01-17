@@ -1,0 +1,13 @@
+name: Task
+description: Create a task
+title: "[Task]: "
+labels: task
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A detailed explanation of what needs to be done, why it is needed, and any context or background.
+      placeholder: "Example: Develop a secure API endpoint for the password reset functionality, adhering to authentication best practices."
+    validations:
+      required: true

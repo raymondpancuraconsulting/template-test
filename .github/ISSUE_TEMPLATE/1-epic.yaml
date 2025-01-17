@@ -1,0 +1,19 @@
+name: Epic
+description: Create an epic
+title: "[Epic]: "
+labels: epic
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A high-level explanation of the epic, including its purpose, context, and business value.
+    validations:
+      required: true
+  - type: textarea
+    id: goals
+    attributes:
+      label: Goals
+      description: The specific outcome or result the epic aims to achieve. It aligns with business objectives or project goals.
+    validations:
+      required: false
