@@ -4,14 +4,12 @@ title: "[User Story]: "
 labels: "user story"
 body:
   - type: textarea
-    id: description
     attributes:
       label: Description
       description: A high-level explanation of the user story, including its purpose, context, and business value.
     validations:
       required: true
   - type: textarea
-    id: acceptance-criteria
     attributes:
       label: Acceptance Criteria
       description: Specific, measurable conditions that define when the story is complete.
