@@ -1,0 +1,143 @@
+name: Propagate Initiative Field to Child Issues
+on:
+  issues:
+    types: [edited]
+
+jobs:
+  propagate-field:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-cache: npm
+          node-version: '20'
+
+      - name: Create field propagation script
+        run: |
+          cat > propagate-fields.ts << 'EOL'
+          import { GraphQLClient, gql } from 'graphql-request';
+
+          interface IssueLink {
+            source: { id: string };
+            target: { id: string };
+          }
+
+          async function getChildIssues(client: GraphQLClient, issueId: string): Promise<string[]> {
+            const query = gql`
+              query GetChildIssues($issueId: ID!) {
+                node(id: $issueId) {
+                  ... on Issue {
+                    trackedInIssues(first: 100) {
+                      nodes {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            const data = await client.request(query, { issueId });
+            return data.node.trackedInIssues.nodes.map((issue: { id: string }) => issue.id);
+          }
+
+          async function getProjectInfo(client: GraphQLClient, issueId: string) {
+            const query = gql`
+              query GetProjectInfo($issueId: ID!) {
+                node(id: $issueId) {
+                  ... on Issue {
+                    projectItems(first: 1) {
+                      nodes {
+                        project {
+                          id
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+
+            const data = await client.request(query, { issueId });
+            const projectItem = data.node.projectItems.nodes[0];
+            return projectItem?.project.id;
+          }
+
+          async function main() {
+            const token = process.env.GITHUB_TOKEN;
+            const issueId = process.env.ISSUE_ID;
+            
+            if (!token || !issueId) {
+              throw new Error('Required environment variables are missing');
+            }
+
+            const client = new GraphQLClient('https://api.github.com/graphql', {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+
+            try {
+              // Get project ID from the parent issue
+              const projectId = await getProjectInfo(client, issueId);
+              if (!projectId) {
+                console.log('Issue is not associated with any project');
+                return;
+              }
+
+              // Get child issues
+              const childIssues = await getChildIssues(client, issueId);
+              if (childIssues.length === 0) {
+                console.log('No child issues found');
+                return;
+              }
+
+              // Import our existing GitHubProjectManager
+              const { default: GitHubProjectManager } = await import('./github-project-manager');
+              const manager = new GitHubProjectManager(token);
+
+              // Propagate the Initiative field
+              await manager.propagateCustomField(
+                issueId,
+                childIssues,
+                projectId,
+                'Initiative'
+              );
+
+            } catch (error) {
+              console.error('Error:', error);
+              process.exit(1);
+            }
+          }
+
+          main();
+          EOL
+
+      - name: Install dependencies
+        run: |
+          npm init -y
+          npm install graphql-request graphql typescript ts-node @types/node
+          npm install --save-dev typescript
+
+      - name: Create tsconfig.json
+        run: |
+          cat > tsconfig.json << 'EOL'
+          {
+            "compilerOptions": {
+              "target": "ES2020",
+              "module": "commonjs",
+              "strict": true,
+              "esModuleInterop": true,
+              "skipLibCheck": true,
+              "forceConsistentCasingInFileNames": true
+            }
+          }
+          EOL
+
+      - name: Run field propagation
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_ID: ${{ github.event.issue.node_id }}
+        run: npx ts-node propagate-fields.ts
