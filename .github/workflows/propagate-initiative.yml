@@ -1,7 +1,7 @@
 name: Propagate Initiative Field to Child Issues
 on:
   issues:
-    types: [edited]
+    types: [opened, edited]
 
 jobs:
   propagate-field:
@@ -70,6 +70,7 @@ jobs:
           async function main() {
             const token = process.env.GITHUB_TOKEN;
             const issueId = process.env.ISSUE_ID;
+            const eventType = process.env.EVENT_TYPE;
             
             if (!token || !issueId) {
               throw new Error('Required environment variables are missing');
@@ -80,6 +81,8 @@ jobs:
             });
 
             try {
+              console.log(`Processing ${eventType} event for issue ${issueId}`);
+
               // Get project ID from the parent issue
               const projectId = await getProjectInfo(client, issueId);
               if (!projectId) {
@@ -140,4 +143,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_ID: ${{ github.event.issue.node_id }}
+          EVENT_TYPE: ${{ github.event.action }}
         run: npx ts-node propagate-fields.ts
